@@ -11,6 +11,7 @@ using CodeImp.DoomBuilder.Data;
 using CodeImp.DoomBuilder.Geometry;
 using CodeImp.DoomBuilder.Map;
 using CodeImp.DoomBuilder.Rendering;
+using CodeImp.DoomBuilder.VisualModes;
 using CodeImp.DoomBuilder.Windows;
 using CodeImp.DoomBuilder.BuilderModes.Interface;
 using System.Windows.Forms;
@@ -559,7 +560,7 @@ namespace CodeImp.DoomBuilder.BuilderModes.IO
 					if (!skipTextures.Contains(texture))
 					{
 						CheckTextureName(ref flatgeo, ref texture);
-						flatgeo[texture].AddRange(OptimizeGeometry(vc.Vertices, (vc.ExtraFloor.VavoomType ? vc.GeometryType : VisualModes.VisualGeometryType.FLOOR)));
+						flatgeo[texture].AddRange(OptimizeGeometry(vc.Vertices, (vc.ExtraFloor.VavoomType ? vc.GeometryType : VisualGeometryType.FLOOR)));
 					}
 				}
 
@@ -570,7 +571,7 @@ namespace CodeImp.DoomBuilder.BuilderModes.IO
 					if (!skipTextures.Contains(texture))
 					{
 						CheckTextureName(ref flatgeo, ref texture);
-						flatgeo[texture].AddRange(OptimizeGeometry(vf.Vertices, (vf.ExtraFloor.VavoomType ? vf.GeometryType : VisualModes.VisualGeometryType.CEILING)));
+						flatgeo[texture].AddRange(OptimizeGeometry(vf.Vertices, (vf.ExtraFloor.VavoomType ? vf.GeometryType : VisualGeometryType.CEILING)));
 					}
 				}
 
@@ -596,25 +597,19 @@ namespace CodeImp.DoomBuilder.BuilderModes.IO
 
 		#region ================== Surface optimization
 
-		private static List<WorldVertex[]> OptimizeGeometry(WorldVertex[] verts, VisualModes.VisualGeometryType geotype)
+		private static List<WorldVertex[]> OptimizeGeometry(WorldVertex[] verts, VisualGeometryType geotype)
 		{
 			return OptimizeGeometry(verts, geotype, false);
 		}
 
-		private static List<WorldVertex[]> OptimizeGeometry(WorldVertex[] verts, VisualModes.VisualGeometryType geotype, bool skiprectoptimization) 
+		private static List<WorldVertex[]> OptimizeGeometry(WorldVertex[] verts, VisualGeometryType geotype, bool skiprectoptimization) 
 		{
 			List<WorldVertex[]> groups = new List<WorldVertex[]>();
 
-			if(!skiprectoptimization && verts.Length == 6) //rectangular surface
+			// Only do optimizations for walls right now. Doing them blindly for floors/ceilings will cause problems with concave sectors with 4 corners
+			if(!skiprectoptimization && verts.Length == 6 && (geotype != VisualGeometryType.CEILING && geotype != VisualGeometryType.FLOOR)) //rectangular surface
 			{
-				if(geotype == VisualModes.VisualGeometryType.CEILING) 
-				{
-					verts = new[] { verts[2], verts[5], verts[1], verts[0] };
-				} 
-				else 
-				{
-					verts = new[] { verts[5], verts[2], verts[1], verts[0] };
-				}
+				verts = new[] { verts[5], verts[2], verts[1], verts[0] };
 				groups.Add(verts);
 			} 
 			else 
@@ -658,8 +653,10 @@ namespace CodeImp.DoomBuilder.BuilderModes.IO
 					Dictionary<WorldVertex, VertexIndices> vertsData = new Dictionary<WorldVertex, VertexIndices>();
 					foreach(WorldVertex[] verts in group.Value) 
 					{
-						//vertex normals. biwa not sure why I need to invert the normal, but it seems to be necessary
-						Vector3D n = new Vector3D(verts[0].nx, verts[0].ny, verts[0].nz).GetNormal() * -1;
+						//vertex normals. biwa not sure why I need to invert the normal's y component, but it seems to be necessary
+						Vector3D n = new Vector3D(verts[0].nx, verts[0].ny, verts[0].nz).GetNormal();
+						n.y *= -1;
+
 						int ni;
 						if(uniqueNormals.ContainsKey(n)) 
 						{
